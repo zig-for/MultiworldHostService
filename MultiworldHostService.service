@@ -1,0 +1,15 @@
+[Unit]
+Description=Bonta Multiworld Service
+After=multi-user.target
+
+[Service]
+User=alttprbot
+Group=alttprbot
+Type=idle
+WorkingDirectory=/opt/MultiworldHostService
+ExecStart=/opt/MultiworldHostService/env/bin/python MultiworldHostService.py
+EnvironmentFile=/opt/MultiworldHostService/.env
+TimeoutStopSec=5
+
+[Install]
+WantedBy=multi-user.target
