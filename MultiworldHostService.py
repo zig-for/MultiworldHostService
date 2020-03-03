@@ -46,18 +46,21 @@ async def create_game():
         token = data['token']
         if token in MULTIWORLDS:
             abort(400, description=f'Game with token {token} already exists.')
+
+        async with aiofiles.open(f"data/{token}_multidata", "rb") as multidata_file:
+            binary = await multidata_file.read()
     else:
         req = urllib.request.Request(
             url=data['multidata_url'],
             headers={'User-Agent': 'SahasrahBot Multiworld Service'}
         )
-        binary = urllib.request.urlopen(req).read()
-        multidata = json.loads(zlib.decompress(binary).decode("utf-8"))
-        
         token = random_string(6)
+        binary = urllib.request.urlopen(req).read()
 
         async with aiofiles.open(f"data/{token}_multidata", "wb") as multidata_file:
             await multidata_file.write(binary)
+
+    multidata = json.loads(zlib.decompress(binary).decode("utf-8"))
 
     ctx = await create_multiserver(port, f"data/{token}_multidata")
 
@@ -116,26 +119,26 @@ async def update_game(token):
     resp = await console_message(MULTIWORLDS[token]['server'], data['msg'])
     return jsonify(resp=resp, success=True)
 
-# @APP.route('/game/<string:token>', methods=['DELETE'])
-# async def delete_game(token):
-#     global MULTIWORLDS
+@APP.route('/game/<string:token>', methods=['DELETE'])
+async def delete_game(token):
+    global MULTIWORLDS
 
-#     if not token in MULTIWORLDS:
-#         abort(404, description=f'Game with token {token} was not found.')
+    if not token in MULTIWORLDS:
+        abort(404, description=f'Game with token {token} was not found.')
 
-#     close_game(token)
-#     return jsonify(success=True)
+    close_game(token)
+    return jsonify(success=True)
 
-# @APP.route('/jobs/cleanup/<int:minutes>', methods=['POST'])
-# async def cleanup(minutes):
-#     global MULTIWORLDS
-#     tokens_to_clean = []
-#     for token in MULTIWORLDS:
-#         if MULTIWORLDS[token]['date'] < datetime.datetime.now()-datetime.timedelta(minutes=minutes):
-#             tokens_to_clean.append(token)
-#     for token in tokens_to_clean:
-#         close_game(token)
-#     return jsonify(success=True, count=len(tokens_to_clean), cleaned_tokens=tokens_to_clean)
+@APP.route('/jobs/cleanup/<int:minutes>', methods=['POST'])
+async def cleanup(minutes):
+    global MULTIWORLDS
+    tokens_to_clean = []
+    for token in MULTIWORLDS:
+        if MULTIWORLDS[token]['date'] < datetime.datetime.now()-datetime.timedelta(minutes=minutes):
+            tokens_to_clean.append(token)
+    for token in tokens_to_clean:
+        close_game(token)
+    return jsonify(success=True, count=len(tokens_to_clean), cleaned_tokens=tokens_to_clean)
 
 @APP.errorhandler(400)
 def bad_request(e):
@@ -150,11 +153,8 @@ def something_bad_happened(e):
     return jsonify(success=False, name=e.name, description=e.description, status_code=e.status_code)
 
 def close_game(token):
-    proc = MULTIWORLDS[token]['proc']
-    if proc.returncode is None:
-        proc.terminate()
-    else:
-        print(f'process {proc.pid} already terminated')
+    server = MULTIWORLDS[token]['server']
+    server.server.ws_server.close()
     del MULTIWORLDS[token]
 
 def is_port_in_use(port):
@@ -277,7 +277,7 @@ async def console_message(ctx: MultiServer.Context, message):
                 if client.socket and not client.socket.closed:
                     MultiServer.forfeit_player(ctx, client.team, client.slot)
     if command[0] == '/senditem' and len(command) > 2:
-        [(player, item)] = re.findall(r'\S* (\S*) (.*)', input)
+        [(player, item)] = re.findall(r'\S* (\S*) (.*)', message)
         if item in Items.item_table:
             for client in ctx.clients:
                 if client.auth and client.name.lower() == player.lower():
@@ -290,7 +290,7 @@ async def console_message(ctx: MultiServer.Context, message):
             return f"Unknown item: {item}"
 
     if command[0][0] != '/':
-        MultiServer.notify_all(ctx, '[Server]: ' + input)
+        MultiServer.notify_all(ctx, '[Server]: ' + message)
 
 if __name__ == '__main__':
     APP.run(host='127.0.0.1', port=5000, use_reloader=False)
