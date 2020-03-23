@@ -16,6 +16,8 @@ import aiofiles
 import websockets
 from quart import Quart, abort, jsonify, request
 
+import sys
+sys.path.insert(1, '../ALttPEntranceRandomizer')
 import Items
 import MultiClient
 import MultiServer
@@ -202,7 +204,7 @@ async def create_multiserver(port, multidatafile):
 
     logging.basicConfig(format='[%(asctime)s] %(message)s', level=getattr(logging, args.loglevel.upper(), logging.INFO))
 
-    ctx = MultiServer.Context(args.host, args.port, args.password)
+    ctx = MultiServer.Context(args.host, args.port, args.password, 1, 1000, False)
 
     ctx.data_filename = args.multidata
 
@@ -247,9 +249,9 @@ async def create_multiserver(port, multidatafile):
 async def console_message(ctx: MultiServer.Context, message):
     command = shlex.split(message)
 
-    # if command[0] == '/exit':
-    #     ctx.server.ws_server.close()
-    #     break
+    if command[0] == '/exit':
+        ctx.server.ws_server.close()
+        return
 
     if command[0] == '/players':
         return MultiServer.get_connected_players_string(ctx)
