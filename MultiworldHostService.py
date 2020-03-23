@@ -192,6 +192,10 @@ def multiworld_converter(o):
     if isinstance(o, asyncio.subprocess.Process):
         return o.pid
 
+
+def on_item_found(ctx, player_found, player_owned, item, location):
+    logging.error("Found item")
+
 async def create_multiserver(port, multidatafile):
     args = argparse.Namespace(
         host='0.0.0.0',
@@ -207,6 +211,7 @@ async def create_multiserver(port, multidatafile):
     ctx = MultiServer.Context(args.host, args.port, args.password, 1, 1000, False)
 
     ctx.data_filename = args.multidata
+    ctx.item_found_cb = on_item_found
 
     try:
         with open(ctx.data_filename, 'rb') as f:
