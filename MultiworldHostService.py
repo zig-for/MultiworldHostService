@@ -22,6 +22,32 @@ import Items
 import MultiClient
 import MultiServer
 
+import multiprocessing
+import multiprocessing.connection
+import queue
+import traceback
+mp_queue = [] 
+mp_conn = None
+def send_to_bot(o):
+    global mp_queue
+    global mp_conn
+    mp_queue.append(o)
+    logging.error('send_to_bot')
+    try:
+        if not mp_conn:
+            mp_conn = multiprocessing.connection.Client('/tmp/nachobot', 'AF_UNIX')
+        logging.error('maybe send?')
+        while mp_queue:
+            mp_conn.send(mp_queue[0])
+            mp_queue = mp_queue[1:]
+    except: 
+        mp_conn = None # probably this is bad 
+        logging.error('no connection to bot yet')
+        logging.error(sys.exc_info()[0])
+        # logging.error(str(serr))
+    
+        traceback.print_exc()
+
 # from config import Config as c
 
 APP = Quart(__name__)
@@ -193,8 +219,16 @@ def multiworld_converter(o):
         return o.pid
 
 
-def on_item_found(ctx, player_found, player_owned, item, location):
-    logging.error("Found item")
+def on_item_found(ctx, player_found, player_found_id, player_owned, player_owned_id, item, location_id, location):
+    for mw in MULTIWORLDS.values():
+        if mw['server'] == ctx:
+            token = mw['token']
+            break
+    
+    if token:
+        send_to_bot({"cmd": "found_item", "data":{"player_found": player_found, "player_found_id": player_found_id, "player_owned": player_owned, "player_owned_id": player_owned_id, "item": item, "location": location, "location_id": location, "token": token}})
+    else:
+        logging.error("Couldn't find game")
 
 async def create_multiserver(port, multidatafile):
     args = argparse.Namespace(
